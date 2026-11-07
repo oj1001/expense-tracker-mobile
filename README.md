@@ -2,6 +2,8 @@
 
 Morrow is a React Native app for tracking everyday spending on Android and iOS. It is built with Expo and TypeScript.
 
+On the Activity tab, choose **Choose file** to import a PhonePe CSV, XLS, or XLSX transaction statement, or select **Download CSV example** to save/share an example with the expected columns. Replace its sample row with your transactions before importing. The API must be running; incoming credits and unsuccessful transactions are skipped, and transactions with an ID are deduplicated on repeat imports.
+
 ## Run the app
 
 ```powershell

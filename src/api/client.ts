@@ -4,6 +4,13 @@ import type { Expense, ExpenseCategory } from '../domain/expense';
 const localHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 export const API_BASE_URL = `http://${localHost}:8080/api`;
 
+export type ExpenseImportResult = {
+  importedCount: number;
+  skippedCount: number;
+  errors: string[];
+  expenses: Expense[];
+};
+
 type ApiExpense = {
   id: string;
   description: string;
@@ -47,7 +54,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
+      ...(init?.body instanceof FormData
+        ? {}
+        : { 'Content-Type': 'application/json' }),
       ...init?.headers,
     },
   });
@@ -76,4 +85,38 @@ export async function createExpense(
     body: JSON.stringify({ ...expense, category: API_CATEGORIES[expense.category] }),
   });
   return toMobileExpense(created);
+}
+
+export async function importPhonePeStatement(
+  file: { uri: string; name: string; mimeType?: string | null },
+): Promise<ExpenseImportResult> {
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const response = await fetch(file.uri);
+    const blob = await response.blob();
+    form.append('file', blob, file.name);
+  } else {
+    const nativeForm = form as FormData & {
+      append(
+        name: string,
+        value: { uri: string; name: string; type: string },
+      ): void;
+    };
+    nativeForm.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType ?? 'application/octet-stream',
+    });
+  }
+
+  const result = await request<{
+    importedCount: number;
+    skippedCount: number;
+    errors: string[];
+    expenses: ApiExpense[];
+  }>('/expenses/import', {
+    method: 'POST',
+    body: form,
+  });
+  return { ...result, expenses: result.expenses.map(toMobileExpense) };
 }

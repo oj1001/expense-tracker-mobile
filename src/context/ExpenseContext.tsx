@@ -7,7 +7,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { createExpense as createRemoteExpense, getExpenses } from '../api/client';
+import {
+  createExpense as createRemoteExpense,
+  getExpenses,
+  importPhonePeStatement,
+  type ExpenseImportResult,
+} from '../api/client';
 import { demoExpenses } from '../data/demoExpenses';
 import type { Expense, ExpenseCategory } from '../domain/expense';
 
@@ -22,6 +27,11 @@ type ExpenseContextValue = {
   expenses: Expense[];
   notice: string | null;
   addExpense: (expense: NewExpense) => Promise<void>;
+  importStatement: (file: {
+    uri: string;
+    name: string;
+    mimeType?: string | null;
+  }) => Promise<ExpenseImportResult>;
 };
 
 const ExpenseContext = createContext<ExpenseContextValue | null>(null);
@@ -73,9 +83,26 @@ export function ExpenseProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const importStatement = useCallback(
+    async (file: { uri: string; name: string; mimeType?: string | null }) => {
+      const result = await importPhonePeStatement(file);
+      setExpenses((current) =>
+        [...result.expenses, ...current.filter(
+          (existing) => !result.expenses.some((imported) => imported.id === existing.id),
+        )].sort(
+          (a, b) =>
+            new Date(b.spentAt).getTime() - new Date(a.spentAt).getTime(),
+        ),
+      );
+      setNotice(null);
+      return result;
+    },
+    [],
+  );
+
   const value = useMemo(
-    () => ({ expenses, notice, addExpense }),
-    [expenses, notice, addExpense],
+    () => ({ expenses, notice, addExpense, importStatement }),
+    [expenses, notice, addExpense, importStatement],
   );
 
   return (
